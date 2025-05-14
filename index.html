@@ -645,16 +645,13 @@
             document.getElementById('doctorIdInput').value = doctor.id;
             document.getElementById('doctorNameInput').value = doctor.name;
             
-            const minConsecutiveStoredValue = doctor.constraints.minConsecutiveWorkDays;
-document.getElementById('doctorMinConsecutiveInput').value = (minConsecutiveStoredValue === null) ? "" : minConsecutiveStoredValue;
-            const maxConsecutiveStoredValue = doctor.constraints.maxConsecutiveWorkDays;
-document.getElementById('doctorMaxConsecutiveInput').value = (maxConsecutiveStoredValue === null || maxConsecutiveStoredValue === 999) ? "" : maxConsecutiveStoredValue;
             document.getElementById('doctorMinConsecutiveInput').value = doctor.constraints.minConsecutiveWorkDays === null || doctor.constraints.minConsecutiveWorkDays === IMPLICIT_MIN_CONSECUTIVE_WORK_DAYS_DEFAULT ? "" : doctor.constraints.minConsecutiveWorkDays;
             document.getElementById('doctorMaxConsecutiveInput').value = doctor.constraints.maxConsecutiveWorkDays === 999 || doctor.constraints.maxConsecutiveWorkDays === IMPLICIT_MAX_CONSECUTIVE_WORK_DAYS_DEFAULT || doctor.constraints.maxConsecutiveWorkDays === null ? "" : doctor.constraints.maxConsecutiveWorkDays;
             document.getElementById('doctorPreviousMonthNightShiftInput').checked = doctor.preferences.previousMonthNightShift;
             
             currentEditingDoctorDesignatedShifts = JSON.parse(JSON.stringify(doctor.preferences.designatedShifts || [])); 
             updateDesignatedShiftsSummary(currentEditingDoctorDesignatedShifts);
+            currentDoctorIdForDesignatedShifts = null;
 
             
             SHIFT_KEYS.forEach(st => {
@@ -690,6 +687,7 @@ document.getElementById('doctorMaxConsecutiveInput').value = (maxConsecutiveStor
         function closeDoctorModal() {
             document.getElementById('doctorModal').style.display = 'none';
             document.getElementById('miniCalendarContainer').innerHTML = ''; 
+            currentEditingDoctorDaysOff = [];
             currentDoctorIdForDesignatedShifts = null; 
             currentEditingDoctorDesignatedShifts = [];
         }
@@ -1050,23 +1048,36 @@ document.getElementById('doctorMaxConsecutiveInput').value = (maxConsecutiveStor
 
 
         // --- Designated Shift Modal & Calendar ---
-        function openDesignatedShiftModal() {
-            const doctorId = document.getElementById('doctorIdInput').value;
-            if (!doctorId) {
-                // For a new doctor not yet saved, use the temporary array
-                // currentEditingDoctorDesignatedShifts should be initialized in openDoctorModalForAdd
-            } else {
-                 const doctor = doctors.find(d => d.id === doctorId);
-                 currentEditingDoctorDesignatedShifts = doctor ? JSON.parse(JSON.stringify(doctor.preferences.designatedShifts || [])) : [];
-                 currentDoctorIdForDesignatedShifts = doctorId; 
-            }
+    function openDesignatedShiftModal() {
+    // 核心邏輯：
+    // currentEditingDoctorDesignatedShifts 這個全域變數，
+    // 應該已經在 openDoctorModalForAdd (設為 []) 或 openDoctorModalForEdit (從醫師資料深拷貝一份) 時被正確設定了。
+    // 這裡我們不需要，也不能重新從 'doctors' 主資料列表載入，因為那樣會丟失在本次主編輯會話中，
+    // 透過 'designatedShiftModal' 已做出的、但尚未最終儲存到主 'doctor' 物件的修改。
 
+    // 獲取當前選定的年月，用於渲染指定班別日曆
+    const scheduleYear = parseInt(document.getElementById('year-select').value);
+    const scheduleMonth = parseInt(document.getElementById('month-select').value);
 
-            const scheduleYear = parseInt(document.getElementById('year-select').value);
-            const scheduleMonth = parseInt(document.getElementById('month-select').value);
-            renderDesignatedShiftCalendar('designatedCalendarContainer', scheduleYear, scheduleMonth, currentEditingDoctorDesignatedShifts);
-            document.getElementById('designatedShiftModal').style.display = 'block';
-        }
+    // 直接使用全域的 currentEditingDoctorDesignatedShifts 來渲染日曆
+    // 這個陣列包含了最新的、正在編輯的指定班別狀態
+    renderDesignatedShiftCalendar('designatedCalendarContainer', scheduleYear, scheduleMonth, currentEditingDoctorDesignatedShifts);
+    document.getElementById('designatedShiftModal').style.display = 'block';
+
+    // 可選：如果您想在「設定指定班別」彈窗標題中顯示醫師姓名
+    // const doctorIdBeingEdited = document.getElementById('doctorIdInput').value;
+    // const doctorNameDisplay = document.getElementById('designatedShiftModalTitle');
+    // if (doctorIdBeingEdited) {
+    //     const doctor = doctors.find(d => d.id === doctorIdBeingEdited);
+    //     if (doctor) {
+    //         doctorNameDisplay.textContent = `設定 ${doctor.name} 的指定班別`;
+    //     } else {
+    //         doctorNameDisplay.textContent = `設定指定班別`; // 備用標題
+    //     }
+    // } else {
+    //     doctorNameDisplay.textContent = `設定新醫師的指定班別`;
+    // }
+}
 
         function renderDesignatedShiftCalendar(containerId, year, month, designatedShiftsArray) {
             const container = document.getElementById(containerId);
