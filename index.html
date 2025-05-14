@@ -1340,7 +1340,7 @@
                                 doc.currentShiftsPerType[shiftKey]++;
                                 doc.assignedShiftsDetails.push({ date: dateStr, shiftType: shiftKey });
                                 if (isWeekendOrHoliday(dateStr, year, month, dsDay)) doc.currentWeekendShifts++; 
-                                doc.currentConsecutiveWorkDays++; 
+
                             } else if (!canWorkResult.canWork) {
                                 console.warn(`無法預排指定班次: ${doc.name} ${dateStr} ${shiftKey} (${canWorkResult.reason})`);
                                 const slotIndexForReason = schedule[dateStr][shiftKey].length; 
@@ -1413,7 +1413,7 @@
                             chosen.currentShiftsPerType[shiftKey]++;
                             chosen.assignedShiftsDetails.push({ date: currentDateStr, shiftType: shiftKey });
                             if (isWeekendOrHoliday(currentDateStr, year, month, day)) chosen.currentWeekendShifts++;
-                            chosen.currentConsecutiveWorkDays++;
+                          
                         } else {
                             schedule[currentDateStr][shiftKey].push('UNASSIGNED');
                             const reasonSlotIndex = existingAssignmentsForShift + slot;
@@ -1428,9 +1428,18 @@
                     }
                 });
 
-                doctors.forEach((doc) => {
-                    if (!doctorsWorkingToday.has(doc.id)) doc.currentConsecutiveWorkDays = 0;
-                });
+               // === 每天結束後，統一更新連續班數 ===
+doctors.forEach(doc => {
+    if (doctorsWorkingToday.has(doc.id)) {
+        // 今天有上班 → 連續天數 +1
+        doc.currentConsecutiveWorkDays =
+            (doc.currentConsecutiveWorkDays || 0) + 1;
+    } else {
+        // 今天沒上班 → 歸 0
+        doc.currentConsecutiveWorkDays = 0;
+    }
+});
+
             }
             return schedule;
         }
