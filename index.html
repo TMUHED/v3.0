@@ -593,6 +593,14 @@
 
 
         function openDoctorModalForAdd() {
+            
+    /* --- NEW: 徹底把舊 dataset.originalValue 清乾淨 --- */
+    document.querySelectorAll('#doctorModal input[type="number"]').forEach(inp=>{
+        inp.value = '';
+        delete inp.dataset.originalValue;   // <- 關鍵，徹底移除
+    });
+    /* -------------------------------------------------- */
+
             document.getElementById('modalTitle').textContent = '新增醫師';
             document.getElementById('doctorIdInput').value = ''; 
             document.getElementById('doctorNameInput').value = '';
