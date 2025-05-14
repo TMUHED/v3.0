@@ -722,60 +722,69 @@
             return (isNaN(parsed) || parsed < 0) ? defaultIfInvalid : parsed;
         }
 
-        function validateDoctorDesignations(doctor) {
-            const errors = [];
-            const year = parseInt(document.getElementById('year-select').value);
-            const month = parseInt(document.getElementById('month-select').value);
+/* ========= NEW validateDoctorDesignations (含 B-1 修正) ========= */
+function validateDoctorDesignations(doctor) {
+    const errors = [];
+    const year  = parseInt(document.getElementById('year-select').value);
+    const month = parseInt(document.getElementById('month-select').value);
 
-            const sortedDesignations = [...(doctor.preferences.designatedShifts || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
+    const sorted = [...(doctor.preferences.designatedShifts || [])]
+                   .sort((a,b) => new Date(a.date) - new Date(b.date));
 
-            for (let i = 0; i < sortedDesignations.length; i++) {
-                const currentDes = sortedDesignations[i];
-                const currentDateObj = new Date(currentDes.date + "T00:00:00"); // Ensure correct date parsing
-                const currentDayOfMonth = currentDateObj.getDate(); // Use getDate() for day of month
-                const currentShiftInfo = SHIFT_DEFINITIONS[currentDes.shift];
+    for (let i = 0; i < sorted.length; i++) {
+        const cur = sorted[i];
+        const curObj = new Date(cur.date + "T00:00:00");
+        const day   = curObj.getDate();
+        const info  = SHIFT_DEFINITIONS[cur.shift];
 
-                // Check against days off
-                if (doctor.daysOff.includes(currentDes.date)) {
-                    errors.push(`${currentDes.date} ${currentDes.shift}班 與預休衝突。`);
-                }
+        /* ─── 預休衝突 ─── */
+        if (doctor.daysOff.includes(cur.date))
+            errors.push(`${cur.date} ${cur.shift}班 與預休衝突`);
 
-                // Check N/SN before day off
-                if (currentShiftInfo.isNight) {
-                    const tomorrow = new Date(currentDateObj);
-                    tomorrow.setDate(currentDateObj.getDate() + 1);
-                    const tomorrowStr = formatDate(tomorrow.getFullYear(), tomorrow.getMonth() + 1, tomorrow.getDate());
-                    if (doctor.daysOff.includes(tomorrowStr)) {
-                        errors.push(`${currentDes.date} ${currentDes.shift}班 後隔天(${tomorrowStr})預休，不允許。`);
-                    }
-                }
-                
-                // Check previous month night shift conflict with day 1 white shift
-                if (currentDayOfMonth === 1 && doctor.preferences.previousMonthNightShift && !currentShiftInfo.isNight) {
-                     errors.push(`本月1日 ${currentDes.shift}班 與上月最後一天夜班設定衝突。`);
-                }
-
-
-                // Check against next designated shift for N->D or K->D
-                if (i + 1 < sortedDesignations.length) {
-                    const nextDes = sortedDesignations[i+1];
-                    const nextDateObj = new Date(nextDes.date + "T00:00:00");
-                    
-                    const dayDiff = (nextDateObj - currentDateObj) / (1000 * 60 * 60 * 24);
-
-                    if (dayDiff === 1) { // If the next designated shift is the very next day
-                        const nextShiftInfo = SHIFT_DEFINITIONS[nextDes.shift];
-                        if (currentShiftInfo.isNight && !nextShiftInfo.isNight) {
-                            errors.push(`指定班衝突: ${currentDes.date} ${currentDes.shift}班 (夜) 後接 ${nextDes.date} ${nextDes.shift}班 (白)。`);
-                        }
-                        if (currentDes.shift === 'K' && nextDes.shift === 'D') {
-                            errors.push(`指定班衝突: ${currentDes.date} K班 後接 ${nextDes.date} D班。`);
-                        }
-                    }
-                }
-            }
-            return errors;
+        /* ─── 夜班隔日休 ─── */
+        if (info.isNight) {
+            const tomorrow = new Date(curObj); tomorrow.setDate(curObj.getDate()+1);
+            const tStr = formatDate(tomorrow.getFullYear(), tomorrow.getMonth()+1, tomorrow.getDate());
+            if (doctor.daysOff.includes(tStr))
+                errors.push(`${cur.date} 夜班後隔天(${tStr})預休`);
         }
+
+        /* ─── 上月夜班 + 本月 1 號白班 ─── */
+        if (day === 1 && doctor.preferences.previousMonthNightShift && !info.isNight)
+            errors.push(`本月 1 日白班與上月最後日夜班衝突`);
+
+        /* ─── 相鄰指定班 (N→D, K→D) ─── */
+        if (i+1 < sorted.length) {
+            const next = sorted[i+1];
+            const dDiff = (new Date(next.date) - curObj)/(24*60*60*1000);
+            if (dDiff === 1) {
+                const nInfo = SHIFT_DEFINITIONS[next.shift];
+                if (info.isNight && !nInfo.isNight)
+                    errors.push(`指定班衝突：${cur.date} 夜班接 ${next.date} 白班`);
+                if (cur.shift==='K' && next.shift==='D')
+                    errors.push(`指定班衝突：${cur.date} K 接 ${next.date} D`);
+            }
+        }
+    }
+
+    /* === B-1：檢查指定班自己就超過「最大連上」 === */
+    const maxCons = doctor.constraints.maxConsecutiveWorkDays === null ||
+                    doctor.constraints.maxConsecutiveWorkDays === 999
+                      ? IMPLICIT_MAX_CONSECUTIVE_WORK_DAYS_DEFAULT
+                      : doctor.constraints.maxConsecutiveWorkDays;
+
+    let streak = 0, lastObj = null;
+    sorted.forEach(ds => {
+        const curObj = new Date(ds.date + "T00:00:00");
+        if (lastObj && (curObj - lastObj) === 24*60*60*1000)  streak++;
+        else                                                  streak = 1;
+        if (streak > maxCons)
+            errors.push(`指定班連續超出上限：${ds.date} 已第 ${streak} 連 (上限 ${maxCons})`);
+        lastObj = curObj;
+    });
+
+    return errors;
+}
 
 
         function createDoctorObject(name, constraintsData, preferencesData, daysOffString, id = null) {
@@ -1670,6 +1679,29 @@ doctors.forEach(doc => {
             dropdown.style.left = `${rect.left + window.scrollX}px`;
             document.body.appendChild(dropdown);
         }
+/* ========= willExceedConsecutiveLimit (for swap) ========= */
+function willExceedConsecutiveLimit(doctor, extraDateStr) {
+    const y = parseInt(extraDateStr.substring(0,4));
+    const m = parseInt(extraDateStr.substring(5,7));
+
+    const maxCons = doctor.constraints.maxConsecutiveWorkDays === null ||
+                    doctor.constraints.maxConsecutiveWorkDays === 999
+                      ? IMPLICIT_MAX_CONSECUTIVE_WORK_DAYS_DEFAULT
+                      : doctor.constraints.maxConsecutiveWorkDays;
+
+    const worked = new Set(doctor.assignedShiftsDetails.map(s=>s.date));
+    worked.add(extraDateStr);         // 假設多排這一天
+
+    let streak = 0;
+    for (let d=1; d<=getDaysInMonth(y,m); d++){
+        const dStr = formatDate(y,m,d);
+        if (worked.has(dStr)){
+            streak++;
+            if (streak > maxCons) return true;   // 會爆表
+        } else streak = 0;
+    }
+    return false;
+}
 
         function handleDoctorSwap(dateStr, shiftKey, slotIndex, oldDoctorId, newDoctorId) {
             const year = parseInt(dateStr.substring(0,4));
@@ -1693,12 +1725,21 @@ doctors.forEach(doc => {
                 }
             }
             
-            const canNewDoctorWork = canWorkShift(tempNewDoctor, shiftKey, dateStr, year, month, dayOfMonth);
+     const canNewDoctorWork = canWorkShift(
+    tempNewDoctor, shiftKey, dateStr, year, month, dayOfMonth
+);
 
-            if (!canNewDoctorWork.canWork) {
-                alert(`無法替換: ${newDoctor.name} ${canNewDoctorWork.reason}`);
-                return;
-            }
+/* === B-2：再檢查連上上限 === */
+if (willExceedConsecutiveLimit(newDoctor, dateStr)) {
+    alert(`無法替換：${newDoctor.name} 會超過最大連續上班天數`);
+    return;
+}
+
+if (!canNewDoctorWork.canWork) {
+    alert(`無法替換：${newDoctor.name} ${canNewDoctorWork.reason}`);
+    return;
+}
+
 
             const shiftAssignments = generatedScheduleData[dateStr][shiftKey];
             const oldDoctorIndexInSlot = shiftAssignments.indexOf(oldDoctorId);
