@@ -182,10 +182,17 @@
         </section>
     </div>
 
-    <div id="doctorModal" class="modal">
+<div id="doctorModal" class="modal">
+    <!-- 新加 form，並把 modal-content 包進去 -->
+    <form id="doctorForm" autocomplete="off" onsubmit="return false;">
         <div class="modal-content">
             <span class="close-button" onclick="closeDoctorModal()">&times;</span>
             <h3 id="modalTitle" class="text-xl font-semibold mb-4">新增醫師</h3>
+            …
+        </div>
+    </form>
+</div>
+
             <input type="hidden" id="doctorIdInput">
             
             <div class="mb-3">
@@ -593,7 +600,8 @@
 
 
         function openDoctorModalForAdd() {
-            
+    // 先把整份表單重置，避免瀏覽器 autofill
+    document.getElementById('doctorForm').reset();            
     /* --- NEW: 徹底把舊 dataset.originalValue 清乾淨 --- */
     document.querySelectorAll('#doctorModal input[type="number"]').forEach(inp=>{
         inp.value = '';
