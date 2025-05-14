@@ -934,11 +934,13 @@ function validateDoctorDesignations(doctor) {
                 let preferencesText = [];
                 if(doctor.preferences.previousMonthNightShift) preferencesText.push('上月最後日夜班');
                 if(doctor.preferences.cannotWorkNights) preferencesText.push('不上N/SN班'); 
-                if(doctor.preferences.cannotWorkShiftTypes.includes('SD') && !doctor.preferences.onlyWorksShiftTypes.includes('SD') && !doctor.preferences.cannotWorkNights) { 
-                   preferencesText.push('不上SD班');
-                } else if (doctor.preferences.rawCannotWorkSDCheckbox && !doctor.preferences.onlyWorksShiftTypes.includes('SD') && !doctor.preferences.cannotWorkNights){
-                    preferencesText.push('不上SD班');
-                }
+          if (doctor.preferences.cannotWorkShiftTypes.includes('SD')
+    && !doctor.preferences.onlyWorksShiftTypes.includes('SD')) {
+    preferencesText.push('不上SD班');
+} else if (doctor.preferences.rawCannotWorkSDCheckbox
+           && !doctor.preferences.onlyWorksShiftTypes.includes('SD')) {
+    preferencesText.push('不上SD班');
+}
 
                 if(doctor.preferences.onlyWorksShiftTypes.includes('SD')) preferencesText.push('僅SD班');
                 if(doctor.preferences.designatedShifts && doctor.preferences.designatedShifts.length > 0) {
